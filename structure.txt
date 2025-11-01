@@ -1,34 +1,37 @@
 movies-api/
 │
 ├── src/main/java/com/example/moviesapi/
-│   ├── MoviesApiApplication.java
+│   ├── MoviesApiApplication.java              # Main Spring Boot application
 │   │
-│   ├── model/
+│   ├── model/                                 # JPA Entities (EXISTING)
 │   │   ├── Genre.java
 │   │   ├── Actor.java
 │   │   └── Movie.java
 │   │
-│   ├── repository/
+│   ├── repository/                            # Spring Data JPA Repositories (EXISTING)
 │   │   ├── GenreRepository.java
 │   │   ├── ActorRepository.java
 │   │   └── MovieRepository.java
 │   │
-│   ├── service/
+│   ├── service/                               # Business Logic Layer (EXISTING)
 │   │   ├── GenreService.java
 │   │   ├── ActorService.java
-│   │   └── MovieService.java
+│   │   ├── MovieService.java
+│   │   └── MovieRecommendationService.java
 │   │
-│   ├── controller/
+│   ├── controller/                            # REST API Controllers (EXISTING)
 │   │   ├── GenreController.java
 │   │   ├── ActorController.java
-│   │   └── MovieController.java
+│   │   ├── MovieController.java
+│   │   ├── RecommendationController.java
+│   │   └── HomeController.java
 │   │
-│   ├── exception/
+│   ├── exception/                             # Custom Exception Handling (EXISTING)
 │   │   ├── ResourceNotFoundException.java
 │   │   ├── InvalidRequestException.java
 │   │   └── GlobalExceptionHandler.java
 │   │
-│   ├── dto/
+│   ├── dto/                                   # Data Transfer Objects (EXISTING)
 │   │   ├── MovieRequest.java
 │   │   ├── ActorRequest.java
 │   │   ├── GenreRequest.java
@@ -36,9 +39,20 @@ movies-api/
 │   │   ├── ActorResponse.java
 │   │   └── GenreResponse.java
 │   │
-│   └── config/
-│       ├── DatabaseConfig.java
-│       └── SQLiteDialect.java
+│   ├── config/                                # Configuration (EXISTING)
+│   │   └── DatabaseConfig.java
+│   │
+│   │
+│   ├── metrics/                               # 🆕 NEW METRICS MODULE
+│   │   ├── RateLimitingService.java
+│   │   ├── ApiMetricsService.java
+│   │   ├── MetricsController.java
+│   │   └── interceptor/
+│   │       └── MetricsInterceptor.java
+│   │
+│   └── cache/                                 # 🆕 NEW CACHING MODULE (Optional)
+│       ├── RedisCacheService.java
+│       └── CacheConfig.java
 │
 ├── src/main/resources/
 │   ├── application.properties

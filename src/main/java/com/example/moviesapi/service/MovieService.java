@@ -8,6 +8,7 @@ import com.example.moviesapi.model.Actor;
 import com.example.moviesapi.repository.MovieRepository;
 import com.example.moviesapi.repository.GenreRepository;
 import com.example.moviesapi.repository.ActorRepository;
+import com.example.moviesapi.cache.SimpleCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,14 +26,17 @@ public class MovieService {
     private final MovieRepository movieRepository;
     private final GenreRepository genreRepository;
     private final ActorRepository actorRepository;
+    private final SimpleCacheService cacheService;
 
     @Autowired
     public MovieService(MovieRepository movieRepository, 
                        GenreRepository genreRepository, 
-                       ActorRepository actorRepository) {
+                       ActorRepository actorRepository,
+                       SimpleCacheService cacheService) {
         this.movieRepository = movieRepository;
         this.genreRepository = genreRepository;
         this.actorRepository = actorRepository;
+        this.cacheService = cacheService;
     }
 
     // CREATE
@@ -49,6 +53,10 @@ public class MovieService {
                 (java.time.Year.now().getValue() + 1));
         }
 
+        // Clear cache when new movie is created
+        cacheService.remove("all_movies");
+        cacheService.remove("all_movies_cached");
+        
         return movieRepository.save(movie);
     }
 
@@ -96,6 +104,41 @@ public class MovieService {
     public List<Genre> getGenresByMovieId(Long movieId) {
         Movie movie = getMovieById(movieId);
         return List.copyOf(movie.getGenres());
+    }
+
+    // CACHED METHODS - NEW
+    @Transactional(readOnly = true)
+    public List<Movie> getAllMoviesCached() {
+        String cacheKey = "all_movies_cached";
+        
+        // Try to get from cache first
+        List<Movie> cachedMovies = (List<Movie>) cacheService.get(cacheKey);
+        if (cachedMovies != null) {
+            return cachedMovies;
+        }
+        
+        // If not in cache, fetch from database and cache it
+        List<Movie> movies = getAllMovies();
+        cacheService.put(cacheKey, movies);
+        
+        return movies;
+    }
+
+    @Transactional(readOnly = true)
+    public Movie getMovieByIdCached(Long id) {
+        String cacheKey = "movie_" + id;
+        
+        Movie cachedMovie = (Movie) cacheService.get(cacheKey);
+        if (cachedMovie != null) {
+            return cachedMovie;
+        }
+        
+        Movie movie = getMovieById(id);
+        if (movie != null) {
+            cacheService.put(cacheKey, movie);
+        }
+        
+        return movie;
     }
 
     // FILTERING AND SEARCH
@@ -161,6 +204,11 @@ public class MovieService {
             movie.setDuration(movieDetails.getDuration());
         }
 
+        // Clear relevant cache entries
+        cacheService.remove("all_movies");
+        cacheService.remove("all_movies_cached");
+        cacheService.remove("movie_" + id);
+        
         return movieRepository.save(movie);
     }
 
@@ -174,6 +222,10 @@ public class MovieService {
         }
         
         genres.forEach(movie::addGenre);
+        
+        // Clear cache for this movie
+        cacheService.remove("movie_" + movieId);
+        
         return movieRepository.save(movie);
     }
 
@@ -182,6 +234,10 @@ public class MovieService {
         List<Genre> genres = genreRepository.findByIdIn(genreIds);
         
         genres.forEach(movie::removeGenre);
+        
+        // Clear cache for this movie
+        cacheService.remove("movie_" + movieId);
+        
         return movieRepository.save(movie);
     }
 
@@ -194,6 +250,10 @@ public class MovieService {
         }
         
         actors.forEach(movie::addActor);
+        
+        // Clear cache for this movie
+        cacheService.remove("movie_" + movieId);
+        
         return movieRepository.save(movie);
     }
 
@@ -202,6 +262,10 @@ public class MovieService {
         List<Actor> actors = actorRepository.findByIdIn(actorIds);
         
         actors.forEach(movie::removeActor);
+        
+        // Clear cache for this movie
+        cacheService.remove("movie_" + movieId);
+        
         return movieRepository.save(movie);
     }
 
@@ -227,6 +291,9 @@ public class MovieService {
             }
             actors.forEach(movie::addActor);
         }
+        
+        // Clear cache for this movie
+        cacheService.remove("movie_" + movieId);
         
         return movieRepository.save(movie);
     }
@@ -263,6 +330,11 @@ public class MovieService {
             }
         }
 
+        // Clear relevant cache entries
+        cacheService.remove("all_movies");
+        cacheService.remove("all_movies_cached");
+        cacheService.remove("movie_" + id);
+        
         movieRepository.delete(movie);
     }
 

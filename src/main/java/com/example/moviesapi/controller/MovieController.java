@@ -82,6 +82,39 @@ public class MovieController {
         return ResponseEntity.ok(genres);
     }
 
+    // CACHED ENDPOINTS - NEW
+    @GetMapping("/cached")
+    public ResponseEntity<List<Movie>> getAllMoviesCached() {
+        try {
+            List<Movie> movies = movieService.getAllMoviesCached();
+            return ResponseEntity.ok(movies);
+        } catch (Exception e) {
+            // Fallback to non-cached version if cache fails
+            List<Movie> movies = movieService.getAllMovies();
+            return ResponseEntity.ok(movies);
+        }
+    }
+
+    @GetMapping("/{id}/cached")
+    public ResponseEntity<Movie> getMovieByIdCached(@PathVariable Long id) {
+        try {
+            Movie movie = movieService.getMovieByIdCached(id);
+            if (movie != null) {
+                return ResponseEntity.ok(movie);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            // Fallback to non-cached version
+            Movie movie = movieService.getMovieById(id);
+            if (movie != null) {
+                return ResponseEntity.ok(movie);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        }
+    }
+
     // FILTERING - Movies by genre ID (required functionality)
     @GetMapping("/by-genre/{genreId}")
     public ResponseEntity<Page<Movie>> getMoviesByGenreId(
