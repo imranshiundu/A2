@@ -1,0 +1,48 @@
+movies-api/
+│
+├── src/main/java/com/example/moviesapi/
+│   ├── MoviesApiApplication.java
+│   │
+│   ├── model/
+│   │   ├── Genre.java
+│   │   ├── Actor.java
+│   │   └── Movie.java
+│   │
+│   ├── repository/
+│   │   ├── GenreRepository.java
+│   │   ├── ActorRepository.java
+│   │   └── MovieRepository.java
+│   │
+│   ├── service/
+│   │   ├── GenreService.java
+│   │   ├── ActorService.java
+│   │   └── MovieService.java
+│   │
+│   ├── controller/
+│   │   ├── GenreController.java
+│   │   ├── ActorController.java
+│   │   └── MovieController.java
+│   │
+│   ├── exception/
+│   │   ├── ResourceNotFoundException.java
+│   │   ├── InvalidRequestException.java
+│   │   └── GlobalExceptionHandler.java
+│   │
+│   ├── dto/
+│   │   ├── MovieRequest.java
+│   │   ├── ActorRequest.java
+│   │   ├── GenreRequest.java
+│   │   ├── MovieResponse.java
+│   │   ├── ActorResponse.java
+│   │   └── GenreResponse.java
+│   │
+│   └── config/
+│       ├── DatabaseConfig.java
+│       └── SQLiteDialect.java
+│
+├── src/main/resources/
+│   ├── application.properties
+│   └── data.sql
+│
+├── pom.xml
+└── README.md
