@@ -1,32 +1,42 @@
 package com.example.moviesapi.model;
 
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "actors")
 public class Actor {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank(message = "Actor name is required")
     @Size(max = 255, message = "Actor name must not exceed 255 characters")
-    @Column(nullable = false, length = 255)
+    @Column(name = "name", nullable = false, length = 255)
     private String name;
 
     @NotNull(message = "Birth date is required")
     @Past(message = "Birth date must be in the past")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Column(nullable = false)
+    @Column(name = "birth_date", nullable = false, columnDefinition = "VARCHAR(255)")
     private LocalDate birthDate;
 
     @ManyToMany(mappedBy = "actors", fetch = FetchType.LAZY)
@@ -37,6 +47,12 @@ public class Actor {
     public Actor() {}
 
     public Actor(String name, LocalDate birthDate) {
+        this.name = name;
+        this.birthDate = birthDate;
+    }
+
+    public Actor(Long id, String name, LocalDate birthDate) {
+        this.id = id;
         this.name = name;
         this.birthDate = birthDate;
     }
@@ -76,13 +92,22 @@ public class Actor {
 
     // Helper methods for managing relationships
     public void addMovie(Movie movie) {
+        if (this.movies == null) {
+            this.movies = new HashSet<>();
+        }
         this.movies.add(movie);
-        movie.getActors().add(this);
+        if (movie.getActors() != null) {
+            movie.getActors().add(this);
+        }
     }
 
     public void removeMovie(Movie movie) {
-        this.movies.remove(movie);
-        movie.getActors().remove(this);
+        if (this.movies != null) {
+            this.movies.remove(movie);
+        }
+        if (movie.getActors() != null) {
+            movie.getActors().remove(this);
+        }
     }
 
     @Override

@@ -1,9 +1,10 @@
 package com.example.moviesapi.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public class GenreRequest {
     
@@ -45,29 +46,6 @@ public class GenreRequest {
     // Validation methods
     public boolean hasMovieIds() {
         return movieIds != null && !movieIds.isEmpty();
-    }
-
-    // Helper methods for name validation
-    public String getNormalizedName() {
-        if (name == null) return null;
-        return name.trim();
-    }
-
-    public void validateName() {
-        if (name != null) {
-            String normalized = getNormalizedName();
-            if (normalized.isEmpty()) {
-                throw new IllegalArgumentException("Genre name cannot be empty or whitespace only");
-            }
-            if (normalized.length() > 100) {
-                throw new IllegalArgumentException("Genre name must not exceed 100 characters");
-            }
-        }
-    }
-
-    // Static validation helper
-    public static boolean isValidGenreName(String name) {
-        return name != null && !name.trim().isEmpty() && name.trim().length() <= 100;
     }
 
     @Override

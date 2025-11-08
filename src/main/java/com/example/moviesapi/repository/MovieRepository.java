@@ -1,6 +1,8 @@
 package com.example.moviesapi.repository;
 
-import com.example.moviesapi.model.Movie;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,8 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
+import com.example.moviesapi.model.Movie;
 
 @Repository
 public interface MovieRepository extends JpaRepository<Movie, Long> {
@@ -19,13 +20,13 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
     // Find movie by exact title match
     Optional<Movie> findByTitle(String title);
 
-    // Case-insensitive search by title containing (for search functionality)
+    // Case-insensitive search by title containing (for search functionality) - REQUIRED
     Page<Movie> findByTitleContainingIgnoreCase(String title, Pageable pageable);
 
-    // Find movies by release year
+    // Find movies by release year - REQUIRED
     List<Movie> findByReleaseYear(Integer releaseYear);
 
-    // Find movies by release year with pagination
+    // Find movies by release year with pagination - REQUIRED
     Page<Movie> findByReleaseYear(Integer releaseYear, Pageable pageable);
 
     // Find movies released between years
@@ -40,13 +41,13 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
     // Find movies shorter than specified duration
     List<Movie> findByDurationLessThanEqual(Integer duration);
 
-    // Find movies by genre ID (required functionality)
+    // Find movies by genre ID (required functionality) - REQUIRED
     @Query("SELECT m FROM Movie m JOIN m.genres g WHERE g.id = :genreId")
-    Page<Movie> findByGenreId(@Param("genreId") Long genreId, Pageable pageable);
+    Page<Movie> findByGenresId(@Param("genreId") Long genreId, Pageable pageable);
 
-    // Find movies by actor ID (required functionality)
+    // Find movies by actor ID (required functionality) - REQUIRED
     @Query("SELECT m FROM Movie m JOIN m.actors a WHERE a.id = :actorId")
-    Page<Movie> findByActorId(@Param("actorId") Long actorId, Pageable pageable);
+    Page<Movie> findByActorsId(@Param("actorId") Long actorId, Pageable pageable);
 
     // Find movies by multiple genres
     @Query("SELECT DISTINCT m FROM Movie m JOIN m.genres g WHERE g.id IN :genreIds")
@@ -107,7 +108,7 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
     // Bulk operations
     List<Movie> findByIdIn(List<Long> ids);
 
-   List<Movie> findByTitleIn(List<String> titles);
+    List<Movie> findByTitleIn(List<String> titles);
     
     // Find movies with no genres
     @Query("SELECT m FROM Movie m WHERE m.genres IS EMPTY")
@@ -116,4 +117,16 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
     // Find movies with no actors
     @Query("SELECT m FROM Movie m WHERE m.actors IS EMPTY")
     List<Movie> findMoviesWithNoActors();
+
+    // NEW METHOD: Find the movie with the highest ID for SQLite
+    Movie findTopByOrderByIdDesc();
+
+    // REQUIRED: Alternative method names for compatibility
+    default Page<Movie> findByGenres_Id(Long genreId, Pageable pageable) {
+        return findByGenresId(genreId, pageable);
+    }
+
+    default Page<Movie> findByActors_Id(Long actorId, Pageable pageable) {
+        return findByActorsId(actorId, pageable);
+    }
 }

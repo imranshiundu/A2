@@ -1,19 +1,21 @@
 package com.example.moviesapi.service;
 
-import com.example.moviesapi.exception.ResourceNotFoundException;
-import com.example.moviesapi.exception.InvalidRequestException;
-import com.example.moviesapi.model.Actor;
-import com.example.moviesapi.model.Movie;
-import com.example.moviesapi.repository.ActorRepository;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
+import com.example.moviesapi.exception.InvalidRequestException;
+import com.example.moviesapi.exception.ResourceNotFoundException;
+import com.example.moviesapi.model.Actor;
+import com.example.moviesapi.model.Movie;
+import com.example.moviesapi.repository.ActorRepository;
 
 @Service
 @Transactional
@@ -26,23 +28,52 @@ public class ActorService {
         this.actorRepository = actorRepository;
     }
 
-    // CREATE
+    // CREATE - Fixed for SQLite
     public Actor createActor(Actor actor) {
-        // Validate birth date is not in the future
+        if (actor.getName() == null || actor.getName().trim().isEmpty()) {
+            throw new InvalidRequestException("Actor name is required");
+        }
+        if (actor.getBirthDate() == null) {
+            throw new InvalidRequestException("Birth date is required");
+        }
+
         if (actor.getBirthDate().isAfter(LocalDate.now())) {
             throw new InvalidRequestException("Birth date cannot be in the future");
         }
 
-        // Check if actor with same name and birth date already exists
-        if (actorRepository.existsByNameAndBirthDate(actor.getName(), actor.getBirthDate())) {
+        // Check for existing actor with same name and birth date
+        if (actorRepository.existsByNameAndBirthDate(actor.getName().trim(), actor.getBirthDate())) {
             throw new InvalidRequestException("Actor with name '" + actor.getName() + 
                 "' and birth date '" + actor.getBirthDate() + "' already exists");
         }
 
+        actor.setName(actor.getName().trim());
+
+        // For SQLite, use the alternative approach directly
+        return createActorAlternative(actor);
+    }
+
+    // Alternative creation method for SQLite
+    private Actor createActorAlternative(Actor actor) {
+        // Get the next available ID manually for SQLite
+        Long nextId = findNextAvailableId();
+        actor.setId(nextId);
+        
+        // Save with explicit ID
         return actorRepository.save(actor);
     }
 
-    // READ
+    // Find next available ID for SQLite
+    private Long findNextAvailableId() {
+        // Get the maximum current ID and add 1
+        Actor lastActor = actorRepository.findTopByOrderByIdDesc();
+        if (lastActor != null && lastActor.getId() != null) {
+            return lastActor.getId() + 1;
+        }
+        return 1L; // Start with 1 if no actors exist
+    }
+
+    // READ ALL
     @Transactional(readOnly = true)
     public List<Actor> getAllActors() {
         return actorRepository.findAll();
@@ -53,74 +84,74 @@ public class ActorService {
         return actorRepository.findAll(pageable);
     }
 
+    // READ BY ID
     @Transactional(readOnly = true)
     public Actor getActorById(Long id) {
         return actorRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Actor not found with id: " + id));
     }
 
+    // GET MOVIES BY ACTOR
     @Transactional(readOnly = true)
     public List<Movie> getMoviesByActorId(Long actorId) {
         Actor actor = getActorById(actorId);
-        return List.copyOf(actor.getMovies()); // Return immutable copy
+        return List.copyOf(actor.getMovies());
     }
 
+    // SEARCH BY NAME
     @Transactional(readOnly = true)
     public Page<Actor> searchActorsByName(String name, Pageable pageable) {
-        return actorRepository.findByNameContainingIgnoreCase(name, pageable);
+        if (name == null || name.trim().isEmpty()) {
+            throw new InvalidRequestException("Search name cannot be empty");
+        }
+        return actorRepository.findByNameContainingIgnoreCase(name.trim(), pageable);
     }
 
-    @Transactional(readOnly = true)
-    public Page<Actor> searchActors(String name, LocalDate minBirthDate, LocalDate maxBirthDate, Pageable pageable) {
-        return actorRepository.findBySearchCriteria(name, minBirthDate, maxBirthDate, pageable);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<Object[]> getAllActorsWithMovieCount(Pageable pageable) {
-        return actorRepository.findAllWithMovieCount(pageable);
-    }
-
-    @Transactional(readOnly = true)
-    public List<Actor> getActorsByBirthDateRange(LocalDate startDate, LocalDate endDate) {
-        return actorRepository.findByBirthDateBetween(startDate, endDate);
-    }
-
-    @Transactional(readOnly = true)
-    public List<Actor> getActorsWithNoMovies() {
-        return actorRepository.findActorsWithNoMovies();
-    }
-
-    // UPDATE
-    public Actor updateActor(Long id, Actor actorDetails) {
+    // PARTIAL UPDATE
+    public Actor partialUpdateActor(Long id, Map<String, Object> updates) {
         Actor actor = getActorById(id);
         
-        // Validate birth date if provided
-        if (actorDetails.getBirthDate() != null && 
-            actorDetails.getBirthDate().isAfter(LocalDate.now())) {
-            throw new InvalidRequestException("Birth date cannot be in the future");
-        }
-
-        // Check for duplicate if name or birth date is being changed
-        if ((actorDetails.getName() != null && !actor.getName().equals(actorDetails.getName())) ||
-            (actorDetails.getBirthDate() != null && !actor.getBirthDate().equals(actorDetails.getBirthDate()))) {
-            
-            String newName = actorDetails.getName() != null ? actorDetails.getName() : actor.getName();
-            LocalDate newBirthDate = actorDetails.getBirthDate() != null ? 
-                actorDetails.getBirthDate() : actor.getBirthDate();
-            
-            if (actorRepository.existsByNameAndBirthDate(newName, newBirthDate)) {
-                throw new InvalidRequestException("Actor with name '" + newName + 
-                    "' and birth date '" + newBirthDate + "' already exists");
+        updates.forEach((key, value) -> {
+            switch (key) {
+                case "name":
+                    if (value != null) {
+                        String newName = value.toString().trim();
+                        if (!newName.isEmpty()) {
+                            if (actorRepository.existsByNameAndBirthDate(newName, actor.getBirthDate()) && 
+                                !actor.getName().equals(newName)) {
+                                throw new InvalidRequestException("Actor with name '" + newName + 
+                                    "' and birth date '" + actor.getBirthDate() + "' already exists");
+                            }
+                            actor.setName(newName);
+                        } else {
+                            throw new InvalidRequestException("Actor name cannot be empty");
+                        }
+                    }
+                    break;
+                    
+                case "birthDate":
+                    if (value != null) {
+                        try {
+                            LocalDate newBirthDate = LocalDate.parse(value.toString());
+                            if (newBirthDate.isAfter(LocalDate.now())) {
+                                throw new InvalidRequestException("Birth date cannot be in the future");
+                            }
+                            if (actorRepository.existsByNameAndBirthDate(actor.getName(), newBirthDate) && 
+                                !actor.getBirthDate().equals(newBirthDate)) {
+                                throw new InvalidRequestException("Actor with name '" + actor.getName() + 
+                                    "' and birth date '" + newBirthDate + "' already exists");
+                            }
+                            actor.setBirthDate(newBirthDate);
+                        } catch (DateTimeParseException e) {
+                            throw new InvalidRequestException("Invalid birth date format. Use yyyy-MM-dd");
+                        }
+                    }
+                    break;
+                    
+                default:
+                    break;
             }
-        }
-
-        // Update fields if provided
-        if (actorDetails.getName() != null) {
-            actor.setName(actorDetails.getName());
-        }
-        if (actorDetails.getBirthDate() != null) {
-            actor.setBirthDate(actorDetails.getBirthDate());
-        }
+        });
 
         return actorRepository.save(actor);
     }
@@ -134,38 +165,18 @@ public class ActorService {
             throw new InvalidRequestException(
                 "Cannot delete actor '" + actor.getName() + 
                 "' because they are associated with " + movieCount + " movie" + 
-                (movieCount > 1 ? "s" : "")
+                (movieCount > 1 ? "s" : "") + ". Use force=true to delete anyway."
             );
         }
 
-        // If force=true, remove relationships before deletion
         if (force) {
-            // Create a copy to avoid ConcurrentModificationException
             List<Movie> movies = List.copyOf(actor.getMovies());
             for (Movie movie : movies) {
-                movie.removeActor(actor);
+                actor.removeMovie(movie);
             }
         }
 
         actorRepository.delete(actor);
-    }
-
-    public void deleteActor(Long id) {
-        deleteActor(id, false);
-    }
-
-    // BULK OPERATIONS
-    public List<Actor> getActorsByIds(List<Long> actorIds) {
-        List<Actor> actors = actorRepository.findByIdIn(actorIds);
-        if (actors.size() != actorIds.size()) {
-            // Find which IDs are missing
-            List<Long> foundIds = actors.stream().map(Actor::getId).toList();
-            List<Long> missingIds = actorIds.stream()
-                    .filter(id -> !foundIds.contains(id))
-                    .toList();
-            throw new ResourceNotFoundException("Actors not found with ids: " + missingIds);
-        }
-        return actors;
     }
 
     // VALIDATION
@@ -174,20 +185,9 @@ public class ActorService {
         return actorRepository.existsById(id);
     }
 
-    // STATISTICS
+    // BULK GET ACTORS BY IDS
     @Transactional(readOnly = true)
-    public Page<Object[]> getTopActorsByMovieCount(Pageable pageable) {
-        return actorRepository.findTopActorsByMovieCount(pageable);
-    }
-
-    @Transactional(readOnly = true)
-    public List<Actor> getActorsWithMinimumMovies(int minMovies) {
-        return actorRepository.findActorsWithMinimumMovies(minMovies);
-    }
-
-    // UTILITY METHODS
-    @Transactional(readOnly = true)
-    public List<Actor> findActorsByMovieId(Long movieId) {
-        return actorRepository.findByMovieId(movieId);
+    public List<Actor> getActorsByIds(List<Long> actorIds) {
+        return actorRepository.findAllById(actorIds);
     }
 }

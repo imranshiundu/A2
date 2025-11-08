@@ -1,20 +1,32 @@
 package com.example.moviesapi.controller;
 
-import com.example.moviesapi.model.Actor;
-import com.example.moviesapi.model.Movie;
-import com.example.moviesapi.service.ActorService;
-import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.time.LocalDate;
-import java.util.List;
+import com.example.moviesapi.model.Actor;
+import com.example.moviesapi.model.Movie;
+import com.example.moviesapi.service.ActorService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/actors")
@@ -28,130 +40,130 @@ public class ActorController {
         this.actorService = actorService;
     }
 
-    // CREATE
+    // CREATE - POST /api/actors 
     @PostMapping
-    public ResponseEntity<Actor> createActor(@Valid @RequestBody Actor actor) {
-        Actor createdActor = actorService.createActor(actor);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdActor);
+    public ResponseEntity<?> createActor(@Valid @RequestBody Actor actor) {
+        try {
+            Actor createdActor = actorService.createActor(actor);
+            URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(createdActor.getId())
+                .toUri();
+            return ResponseEntity.created(location).body(createdActor);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "Failed to create actor: " + e.getMessage()));
+        }
     }
 
-    // READ - All actors
+    // READ ALL - GET /api/actors
     @GetMapping
     public ResponseEntity<List<Actor>> getAllActors() {
         List<Actor> actors = actorService.getAllActors();
         return ResponseEntity.ok(actors);
     }
 
-    // READ - All actors with pagination
-    @GetMapping("/paged")
-    public ResponseEntity<Page<Actor>> getAllActorsPaged(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Actor> actors = actorService.getAllActors(pageable);
-        return ResponseEntity.ok(actors);
-    }
-
-    // READ - Actor by ID
+    // READ BY ID - GET /api/actors/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<Actor> getActorById(@PathVariable Long id) {
-        Actor actor = actorService.getActorById(id);
-        return ResponseEntity.ok(actor);
+    public ResponseEntity<?> getActorById(@PathVariable Long id) {
+        try {
+            Actor actor = actorService.getActorById(id);
+            return ResponseEntity.ok(actor);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Actor not found with id: " + id));
+        }
     }
 
-    // READ - Movies by actor ID
-    @GetMapping("/{id}/movies")
-    public ResponseEntity<List<Movie>> getMoviesByActorId(@PathVariable Long id) {
-        List<Movie> movies = actorService.getMoviesByActorId(id);
-        return ResponseEntity.ok(movies);
+    // UPDATE - PATCH /api/actors/{id}
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> updateActor(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> updates) {
+        try {
+            if (updates.containsKey("id")) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "ID field cannot be updated"));
+            }
+            
+            Actor updatedActor = actorService.partialUpdateActor(id, updates);
+            return ResponseEntity.ok(updatedActor);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Failed to update actor: " + e.getMessage()));
+        }
     }
 
-    // READ - Search actors by name (required functionality)
+    // DELETE - DELETE /api/actors/{id}
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteActor(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean force) {
+        try {
+            actorService.deleteActor(id, force);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Actor not found with id: " + id));
+        }
+    }
+
+    // SEARCH - GET /api/actors/search?name={name}
     @GetMapping("/search")
-    public ResponseEntity<Page<Actor>> searchActorsByName(
+    public ResponseEntity<?> searchActorsByName(
             @RequestParam String name,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Actor> actors = actorService.searchActorsByName(name, pageable);
-        return ResponseEntity.ok(actors);
+        try {
+            if (page < 0 || size <= 0 || size > 100) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid pagination parameters: page must be >= 0, size between 1 and 100"));
+            }
+            Pageable pageable = PageRequest.of(page, size);
+            Page<Actor> actors = actorService.searchActorsByName(name, pageable);
+            return ResponseEntity.ok(actors);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Search failed: " + e.getMessage()));
+        }
     }
 
-    // READ - Advanced search with multiple criteria
-    @GetMapping("/advanced-search")
-    public ResponseEntity<Page<Actor>> advancedSearchActors(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate minBirthDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate maxBirthDate,
+    // GET MOVIES BY ACTOR - GET /api/actors/{id}/movies
+    @GetMapping("/{id}/movies")
+    public ResponseEntity<?> getMoviesByActorId(@PathVariable Long id) {
+        try {
+            List<Movie> movies = actorService.getMoviesByActorId(id);
+            return ResponseEntity.ok(movies);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Actor not found with id: " + id));
+        }
+    }
+
+    // PAGINATED ACTORS - GET /api/actors/paged
+    @GetMapping("/paged")
+    public ResponseEntity<?> getAllActorsPaged(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Actor> actors = actorService.searchActors(name, minBirthDate, maxBirthDate, pageable);
-        return ResponseEntity.ok(actors);
+        try {
+            if (page < 0 || size <= 0 || size > 100) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid pagination parameters: page must be >= 0, size between 1 and 100"));
+            }
+            Pageable pageable = PageRequest.of(page, size);
+            Page<Actor> actors = actorService.getAllActors(pageable);
+            return ResponseEntity.ok(actors);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Failed to retrieve actors: " + e.getMessage()));
+        }
     }
 
-    // READ - Actors by birth date range
-    @GetMapping("/by-birthdate")
-    public ResponseEntity<List<Actor>> getActorsByBirthDateRange(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        List<Actor> actors = actorService.getActorsByBirthDateRange(startDate, endDate);
-        return ResponseEntity.ok(actors);
-    }
-
-    // READ - Actors with movie count
-    @GetMapping("/stats/with-movie-count")
-    public ResponseEntity<Page<Object[]>> getAllActorsWithMovieCount(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Object[]> actorsWithCount = actorService.getAllActorsWithMovieCount(pageable);
-        return ResponseEntity.ok(actorsWithCount);
-    }
-
-    // READ - Top actors by movie count
-    @GetMapping("/stats/top-by-movies")
-    public ResponseEntity<Page<Object[]>> getTopActorsByMovieCount(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Object[]> topActors = actorService.getTopActorsByMovieCount(pageable);
-        return ResponseEntity.ok(topActors);
-    }
-
-    // READ - Actors with no movies
-    @GetMapping("/stats/no-movies")
-    public ResponseEntity<List<Actor>> getActorsWithNoMovies() {
-        List<Actor> actors = actorService.getActorsWithNoMovies();
-        return ResponseEntity.ok(actors);
-    }
-
-    // UPDATE
-    @PatchMapping("/{id}")
-    public ResponseEntity<Actor> updateActor(
-            @PathVariable Long id,
-            @Valid @RequestBody Actor actorDetails) {
-        Actor updatedActor = actorService.updateActor(id, actorDetails);
-        return ResponseEntity.ok(updatedActor);
-    }
-
-    // DELETE
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteActor(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "false") boolean force) {
-        actorService.deleteActor(id, force);
-        return ResponseEntity.noContent().build();
-    }
-
-    // BULK GET actors by IDs
-    @PostMapping("/bulk")
-    public ResponseEntity<List<Actor>> getActorsByIds(@RequestBody List<Long> actorIds) {
-        List<Actor> actors = actorService.getActorsByIds(actorIds);
-        return ResponseEntity.ok(actors);
-    }
-
-    // CHECK EXISTENCE
+    // CHECK IF ACTOR EXISTS - GET /api/actors/{id}/exists
     @GetMapping("/{id}/exists")
     public ResponseEntity<Boolean> actorExists(@PathVariable Long id) {
         boolean exists = actorService.actorExists(id);

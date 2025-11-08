@@ -24,6 +24,7 @@ com/example/moviesapi/exception/GlobalExceptionHandler$ErrorResponse.class
 com/example/moviesapi/dto/MovieRequest.class
 com/example/moviesapi/exception/InvalidRequestException.class
 com/example/moviesapi/MoviesApiApplication.class
+com/example/moviesapi/converter/LocalDateAttributeConverter.class
 com/example/moviesapi/dto/MovieResponse.class
 com/example/moviesapi/dto/ActorRequest.class
 com/example/moviesapi/metrics/MetricsInterceptor.class

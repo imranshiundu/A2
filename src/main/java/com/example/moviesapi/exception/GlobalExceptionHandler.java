@@ -1,19 +1,17 @@
 package com.example.moviesapi.exception;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -39,10 +37,33 @@ public class GlobalExceptionHandler {
             "Invalid Request",
             ex.getMessage(),
             request.getDescription(false),
+            LocalDateTime.now()
+        );
+        
+        // Add extended metadata if available
+        if (ex.getErrorCode() != null) {
+            errorResponse.setErrorCode(ex.getErrorCode());
+        }
+        if (ex.getFieldName() != null) {
+            errorResponse.setFieldName(ex.getFieldName());
+        }
+        if (ex.getRejectedValue() != null) {
+            errorResponse.setRejectedValue(ex.getRejectedValue());
+        }
+        
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    // Handle IllegalStateException (for force delete scenarios)
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalStateException(IllegalStateException ex, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            "Invalid Operation",
+            ex.getMessage(),
+            request.getDescription(false),
             LocalDateTime.now(),
-            ex.getErrorCode(),
-            ex.getFieldName(),
-            ex.getRejectedValue()
+            "INVALID_OPERATION"
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
@@ -50,7 +71,6 @@ public class GlobalExceptionHandler {
     // Handle validation errors from @Valid
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
-        // Collect field errors
         Map<String, String> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -67,12 +87,10 @@ public class GlobalExceptionHandler {
             "Validation Failed",
             errorMessage,
             request.getDescription(false),
-            LocalDateTime.now(),
-            "VALIDATION_ERROR",
-            null,
-            null,
-            errors
+            LocalDateTime.now()
         );
+        errorResponse.setErrorCode("VALIDATION_ERROR");
+        errorResponse.setValidationErrors(errors);
         
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
@@ -91,11 +109,11 @@ public class GlobalExceptionHandler {
             "Type Mismatch",
             errorMessage,
             request.getDescription(false),
-            LocalDateTime.now(),
-            "TYPE_MISMATCH",
-            ex.getName(),
-            ex.getValue()
+            LocalDateTime.now()
         );
+        errorResponse.setErrorCode("TYPE_MISMATCH");
+        errorResponse.setFieldName(ex.getName());
+        errorResponse.setRejectedValue(ex.getValue());
         
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
@@ -116,7 +134,6 @@ public class GlobalExceptionHandler {
     // Handle all other exceptions
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
-        // Log the exception for debugging
         ex.printStackTrace();
         
         ErrorResponse errorResponse = new ErrorResponse(
@@ -150,20 +167,10 @@ public class GlobalExceptionHandler {
             this.timestamp = timestamp;
         }
 
-        // Constructor for validation errors
-        public ErrorResponse(int status, String error, String message, String path, LocalDateTime timestamp, 
-                           String errorCode, String fieldName, Object rejectedValue) {
+        // Constructor with error code
+        public ErrorResponse(int status, String error, String message, String path, LocalDateTime timestamp, String errorCode) {
             this(status, error, message, path, timestamp);
             this.errorCode = errorCode;
-            this.fieldName = fieldName;
-            this.rejectedValue = rejectedValue;
-        }
-
-        // Constructor for field validation errors
-        public ErrorResponse(int status, String error, String message, String path, LocalDateTime timestamp,
-                           String errorCode, String fieldName, Object rejectedValue, Map<String, String> validationErrors) {
-            this(status, error, message, path, timestamp, errorCode, fieldName, rejectedValue);
-            this.validationErrors = validationErrors;
         }
 
         // Getters

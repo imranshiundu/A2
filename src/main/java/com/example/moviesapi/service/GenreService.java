@@ -1,18 +1,19 @@
 package com.example.moviesapi.service;
 
-import com.example.moviesapi.exception.ResourceNotFoundException;
-import com.example.moviesapi.exception.InvalidRequestException;
-import com.example.moviesapi.model.Genre;
-import com.example.moviesapi.model.Movie;
-import com.example.moviesapi.repository.GenreRepository;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import com.example.moviesapi.exception.InvalidRequestException;
+import com.example.moviesapi.exception.ResourceNotFoundException;
+import com.example.moviesapi.model.Genre;
+import com.example.moviesapi.model.Movie;
+import com.example.moviesapi.repository.GenreRepository;
 
 @Service
 @Transactional
@@ -27,11 +28,24 @@ public class GenreService {
 
     // CREATE
     public Genre createGenre(Genre genre) {
-        // Check if genre with same name already exists (case-insensitive)
         if (genreRepository.existsByNameIgnoreCase(genre.getName())) {
             throw new InvalidRequestException("Genre with name '" + genre.getName() + "' already exists");
         }
+        
+        // For SQLite, use manual ID generation
+        Long nextId = findNextAvailableId();
+        genre.setId(nextId);
+        
         return genreRepository.save(genre);
+    }
+
+    // Find next available ID for SQLite
+    private Long findNextAvailableId() {
+        Genre lastGenre = genreRepository.findTopByOrderByIdDesc();
+        if (lastGenre != null && lastGenre.getId() != null) {
+            return lastGenre.getId() + 1;
+        }
+        return 1L;
     }
 
     // READ
@@ -59,7 +73,7 @@ public class GenreService {
     @Transactional(readOnly = true)
     public List<Movie> getMoviesByGenreId(Long genreId) {
         Genre genre = getGenreById(genreId);
-        return List.copyOf(genre.getMovies()); // Return immutable copy
+        return List.copyOf(genre.getMovies());
     }
 
     @Transactional(readOnly = true)
@@ -81,14 +95,12 @@ public class GenreService {
     public Genre updateGenre(Long id, Genre genreDetails) {
         Genre genre = getGenreById(id);
         
-        // Check if new name already exists (excluding current genre)
         if (genreDetails.getName() != null && 
             !genre.getName().equalsIgnoreCase(genreDetails.getName()) &&
             genreRepository.existsByNameIgnoreCase(genreDetails.getName())) {
             throw new InvalidRequestException("Genre with name '" + genreDetails.getName() + "' already exists");
         }
 
-        // Update fields if provided
         if (genreDetails.getName() != null) {
             genre.setName(genreDetails.getName());
         }
@@ -109,12 +121,10 @@ public class GenreService {
             );
         }
 
-        // If force=true, remove relationships before deletion
         if (force) {
-            // Create a copy to avoid ConcurrentModificationException
             List<Movie> movies = List.copyOf(genre.getMovies());
             for (Movie movie : movies) {
-                movie.removeGenre(genre);
+                genre.removeMovie(movie);
             }
         }
 
@@ -127,7 +137,6 @@ public class GenreService {
 
     // BULK OPERATIONS
     public List<Genre> createGenres(List<Genre> genres) {
-        // Check for duplicates in the request
         long distinctNames = genres.stream()
                 .map(genre -> genre.getName().toLowerCase())
                 .distinct()
@@ -137,7 +146,6 @@ public class GenreService {
             throw new InvalidRequestException("Duplicate genre names in the request");
         }
 
-        // Check for existing genres
         List<String> genreNames = genres.stream()
                 .map(Genre::getName)
                 .toList();
@@ -146,6 +154,13 @@ public class GenreService {
         if (!existingGenres.isEmpty()) {
             throw new InvalidRequestException("Some genres already exist: " + 
                 existingGenres.stream().map(Genre::getName).toList());
+        }
+
+        // Assign IDs for SQLite
+        Long nextId = findNextAvailableId();
+        for (Genre genre : genres) {
+            genre.setId(nextId);
+            nextId++;
         }
 
         return genreRepository.saveAll(genres);

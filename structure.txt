@@ -3,60 +3,61 @@ movies-api/
 ├── src/main/java/com/example/moviesapi/
 │   ├── MoviesApiApplication.java              # Main Spring Boot application
 │   │
-│   ├── model/                                 # JPA Entities (EXISTING)
-│   │   ├── Genre.java
-│   │   ├── Actor.java
-│   │   └── Movie.java
+│   ├── model/                                 # JPA Entities
+│   │   ├── Genre.java                         # Genre entity (id, name)
+│   │   ├── Actor.java                         # Actor entity (id, name, birthDate)
+│   │   └── Movie.java                         # Movie entity (id, title, releaseYear, duration)
 │   │
-│   ├── repository/                            # Spring Data JPA Repositories (EXISTING)
+│   ├── repository/                            # Spring Data JPA Repositories
 │   │   ├── GenreRepository.java
 │   │   ├── ActorRepository.java
 │   │   └── MovieRepository.java
 │   │
-│   ├── service/                               # Business Logic Layer (EXISTING)
+│   ├── service/                               # Business Logic Layer
 │   │   ├── GenreService.java
 │   │   ├── ActorService.java
 │   │   ├── MovieService.java
-│   │   └── MovieRecommendationService.java
+│   │   └── MovieRecommendationService.java    # AI Recommendation Engine
 │   │
-│   ├── controller/                            # REST API Controllers (EXISTING)
+│   ├── controller/                            # REST API Controllers
 │   │   ├── GenreController.java
 │   │   ├── ActorController.java
 │   │   ├── MovieController.java
-│   │   ├── RecommendationController.java
-│   │   └── HomeController.java
+│   │   ├── RecommendationController.java      # Recommendation Endpoints
+│   │   ├── HomeController.java                # Root endpoint controller
+│   │   └── MetricsController.java             # API metrics and health
 │   │
-│   ├── exception/                             # Custom Exception Handling (EXISTING)
+│   ├── exception/                             # Custom Exception Handling
 │   │   ├── ResourceNotFoundException.java
 │   │   ├── InvalidRequestException.java
 │   │   └── GlobalExceptionHandler.java
 │   │
-│   ├── dto/                                   # Data Transfer Objects (EXISTING)
-│   │   ├── MovieRequest.java
+│   ├── dto/                                   # Data Transfer Objects
+│   │   ├── MovieRequest.java                  # Request DTOs for validation
 │   │   ├── ActorRequest.java
 │   │   ├── GenreRequest.java
-│   │   ├── MovieResponse.java
+│   │   ├── MovieResponse.java                 # Response DTOs for clean API
 │   │   ├── ActorResponse.java
 │   │   └── GenreResponse.java
 │   │
-│   ├── config/                                # Configuration (EXISTING)
-│   │   └── DatabaseConfig.java
+│   ├── config/                                # Configuration classes
+│   │   ├── DatabaseConfig.java                # JPA Configuration
+│   │   └── WebConfig.java                     # Web MVC Configuration
 │   │
+│   ├── metrics/                               # Metrics and Monitoring
+│   │   ├── ApiMetricsService.java             # API usage statistics
+│   │   ├── MetricsController.java             # Metrics endpoints
+│   │   └── MetricsInterceptor.java            # Request interceptor
 │   │
-│   ├── metrics/                               # 🆕 NEW METRICS MODULE
-│   │   ├── RateLimitingService.java
-│   │   ├── ApiMetricsService.java
-│   │   ├── MetricsController.java
-│   │   └── interceptor/
-│   │       └── MetricsInterceptor.java
-│   │
-│   └── cache/                                 # 🆕 NEW CACHING MODULE (Optional)
-│       ├── RedisCacheService.java
-│       └── CacheConfig.java
+│   └── cache/                                 # Caching System
+│       ├── SimpleCacheService.java            # In-memory caching
+│       └── CacheController.java               # Cache management endpoints
 │
 ├── src/main/resources/
-│   ├── application.properties
-│   └── data.sql
+│   ├── application.properties                 # Application configuration
+│   └── data.sql                              # Sample data (25 movies, 20 actors, 9 genres)
 │
-├── pom.xml
-└── README.md
+├── pom.xml                                   # Maven dependencies
+├── README.md                                 # This file
+├── test-all-features.sh                      # Complete testing script
+└── test-recommendations.sh                   # Recommendation testing script

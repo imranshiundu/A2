@@ -1,13 +1,15 @@
 package com.example.moviesapi.dto;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 
 public class ActorRequest {
     
@@ -64,23 +66,6 @@ public class ActorRequest {
     // Validation methods
     public boolean hasMovieIds() {
         return movieIds != null && !movieIds.isEmpty();
-    }
-
-    // Helper methods for validation
-    public void validateBirthDate() {
-        if (birthDate != null && birthDate.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("Birth date cannot be in the future");
-        }
-    }
-
-    // Age calculation helper
-    public int calculateAge() {
-        if (birthDate == null) return 0;
-        return java.time.Period.between(birthDate, LocalDate.now()).getYears();
-    }
-
-    public boolean isAdult() {
-        return calculateAge() >= 18;
     }
 
     @Override

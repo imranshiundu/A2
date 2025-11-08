@@ -1,10 +1,10 @@
 package com.example.moviesapi.cache;
 
-import org.springframework.stereotype.Service;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+
+import org.springframework.stereotype.Service;
 
 @Service
 public class SimpleCacheService {
@@ -24,13 +24,19 @@ public class SimpleCacheService {
         if (entry != null && !entry.isExpired()) {
             return entry.getValue();
         }
-        cache.remove(key); // Remove expired entry
+        if (entry != null) {
+            cache.remove(key); // Remove expired entry
+        }
         return null;
     }
 
     public boolean contains(String key) {
         CacheEntry entry = cache.get(key);
-        return entry != null && !entry.isExpired();
+        if (entry != null && entry.isExpired()) {
+            cache.remove(key);
+            return false;
+        }
+        return entry != null;
     }
 
     public void remove(String key) {
@@ -42,18 +48,18 @@ public class SimpleCacheService {
     }
 
     public int size() {
-        return (int) cache.values().stream()
-                .filter(entry -> !entry.isExpired())
-                .count();
+        // Clean up expired entries while calculating size
+        cache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+        return cache.size();
     }
 
     public Map<String, Object> getStats() {
-        long currentTime = System.currentTimeMillis();
+        // Clean up expired entries before getting stats
+        cache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+        
         int totalEntries = cache.size();
-        int activeEntries = (int) cache.values().stream()
-                .filter(entry -> !entry.isExpired())
-                .count();
-        int expiredEntries = totalEntries - activeEntries;
+        int activeEntries = totalEntries; // All remaining are active after cleanup
+        int expiredEntries = 0; // All expired entries have been removed
 
         return Map.of(
             "totalEntries", totalEntries,

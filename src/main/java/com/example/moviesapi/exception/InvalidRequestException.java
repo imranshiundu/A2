@@ -95,13 +95,12 @@ public class InvalidRequestException extends RuntimeException {
         );
     }
 
-    public static InvalidRequestException cannotDeleteWithRelationships(String resourceName, String resourceIdentifier, int relationshipCount, String relationshipType) {
+    public static InvalidRequestException cannotDeleteWithRelationships(String resourceType, int relationshipCount, String relationshipName) {
         String message = String.format(
-            "Cannot delete %s '%s' because it has %d associated %s. Use force=true to delete anyway.",
-            resourceName.toLowerCase(),
-            resourceIdentifier,
+            "Cannot delete %s because it has %d associated %s. Use force=true to delete anyway.",
+            resourceType.toLowerCase(),
             relationshipCount,
-            relationshipType + (relationshipCount > 1 ? "s" : "")
+            relationshipName + (relationshipCount > 1 ? "s" : "")
         );
         return new InvalidRequestException(message, "HAS_RELATIONSHIPS");
     }

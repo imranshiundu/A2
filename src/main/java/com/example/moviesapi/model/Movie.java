@@ -1,33 +1,46 @@
 package com.example.moviesapi.model;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
 import java.util.HashSet;
 import java.util.Set;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Entity
 @Table(name = "movies")
 public class Movie {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank(message = "Movie title is required")
     @Size(max = 255, message = "Movie title must not exceed 255 characters")
-    @Column(nullable = false, length = 255)
+    @Column(name = "title", nullable = false, length = 255)
     private String title;
 
     @NotNull(message = "Release year is required")
     @Min(value = 1888, message = "Release year must be 1888 or later")
-    @Max(value = 2030, message = "Release year must be 2030 or earlier")
-    @Column(nullable = false)
+    @Column(name = "release_year", nullable = false)
     private Integer releaseYear;
 
     @NotNull(message = "Duration is required")
     @Min(value = 1, message = "Duration must be at least 1 minute")
     @Max(value = 500, message = "Duration must not exceed 500 minutes")
-    @Column(nullable = false)
+    @Column(name = "duration", nullable = false)
     private Integer duration; // in minutes
 
     @ManyToMany(fetch = FetchType.LAZY)
@@ -50,6 +63,13 @@ public class Movie {
     public Movie() {}
 
     public Movie(String title, Integer releaseYear, Integer duration) {
+        this.title = title;
+        this.releaseYear = releaseYear;
+        this.duration = duration;
+    }
+
+    public Movie(Long id, String title, Integer releaseYear, Integer duration) {
+        this.id = id;
         this.title = title;
         this.releaseYear = releaseYear;
         this.duration = duration;
@@ -106,23 +126,41 @@ public class Movie {
 
     // Helper methods for managing relationships
     public void addGenre(Genre genre) {
+        if (this.genres == null) {
+            this.genres = new HashSet<>();
+        }
         this.genres.add(genre);
-        genre.getMovies().add(this);
+        if (genre.getMovies() != null) {
+            genre.getMovies().add(this);
+        }
     }
 
     public void removeGenre(Genre genre) {
-        this.genres.remove(genre);
-        genre.getMovies().remove(this);
+        if (this.genres != null) {
+            this.genres.remove(genre);
+        }
+        if (genre.getMovies() != null) {
+            genre.getMovies().remove(this);
+        }
     }
 
     public void addActor(Actor actor) {
+        if (this.actors == null) {
+            this.actors = new HashSet<>();
+        }
         this.actors.add(actor);
-        actor.getMovies().add(this);
+        if (actor.getMovies() != null) {
+            actor.getMovies().add(this);
+        }
     }
 
     public void removeActor(Actor actor) {
-        this.actors.remove(actor);
-        actor.getMovies().remove(this);
+        if (this.actors != null) {
+            this.actors.remove(actor);
+        }
+        if (actor.getMovies() != null) {
+            actor.getMovies().remove(this);
+        }
     }
 
     @Override

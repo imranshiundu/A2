@@ -1,23 +1,22 @@
 package com.example.moviesapi.service;
 
-import com.example.moviesapi.exception.ResourceNotFoundException;
-import com.example.moviesapi.exception.InvalidRequestException;
-import com.example.moviesapi.model.Movie;
-import com.example.moviesapi.model.Genre;
-import com.example.moviesapi.model.Actor;
-import com.example.moviesapi.repository.MovieRepository;
-import com.example.moviesapi.repository.GenreRepository;
-import com.example.moviesapi.repository.ActorRepository;
-import com.example.moviesapi.cache.SimpleCacheService;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import com.example.moviesapi.cache.SimpleCacheService;
+import com.example.moviesapi.exception.InvalidRequestException;
+import com.example.moviesapi.exception.ResourceNotFoundException;
+import com.example.moviesapi.model.Actor;
+import com.example.moviesapi.model.Genre;
+import com.example.moviesapi.model.Movie;
+import com.example.moviesapi.repository.ActorRepository;
+import com.example.moviesapi.repository.GenreRepository;
+import com.example.moviesapi.repository.MovieRepository;
 
 @Service
 @Transactional
@@ -41,34 +40,42 @@ public class MovieService {
 
     // CREATE
     public Movie createMovie(Movie movie) {
-        // Validate movie doesn't already exist
         if (movieRepository.existsByTitleAndReleaseYear(movie.getTitle(), movie.getReleaseYear())) {
             throw new InvalidRequestException("Movie with title '" + movie.getTitle() + 
                 "' and release year '" + movie.getReleaseYear() + "' already exists");
         }
 
-        // Validate release year is reasonable
         if (movie.getReleaseYear() < 1888 || movie.getReleaseYear() > java.time.Year.now().getValue() + 1) {
             throw new InvalidRequestException("Release year must be between 1888 and " + 
                 (java.time.Year.now().getValue() + 1));
         }
 
-        // Clear cache when new movie is created
+        // For SQLite, use manual ID generation
+        Long nextId = findNextAvailableId();
+        movie.setId(nextId);
+
         cacheService.remove("all_movies");
         cacheService.remove("all_movies_cached");
         
         return movieRepository.save(movie);
     }
 
+    // Find next available ID for SQLite
+    private Long findNextAvailableId() {
+        Movie lastMovie = movieRepository.findTopByOrderByIdDesc();
+        if (lastMovie != null && lastMovie.getId() != null) {
+            return lastMovie.getId() + 1;
+        }
+        return 1L;
+    }
+
     public Movie createMovieWithRelations(Movie movie, List<Long> genreIds, List<Long> actorIds) {
         Movie savedMovie = createMovie(movie);
         
-        // Add genres if provided
         if (genreIds != null && !genreIds.isEmpty()) {
             addGenresToMovie(savedMovie.getId(), genreIds);
         }
         
-        // Add actors if provided
         if (actorIds != null && !actorIds.isEmpty()) {
             addActorsToMovie(savedMovie.getId(), actorIds);
         }
@@ -106,18 +113,16 @@ public class MovieService {
         return List.copyOf(movie.getGenres());
     }
 
-    // CACHED METHODS - NEW
+    // CACHED METHODS
     @Transactional(readOnly = true)
     public List<Movie> getAllMoviesCached() {
         String cacheKey = "all_movies_cached";
         
-        // Try to get from cache first
         List<Movie> cachedMovies = (List<Movie>) cacheService.get(cacheKey);
         if (cachedMovies != null) {
             return cachedMovies;
         }
         
-        // If not in cache, fetch from database and cache it
         List<Movie> movies = getAllMovies();
         cacheService.put(cacheKey, movies);
         
@@ -141,13 +146,13 @@ public class MovieService {
         return movie;
     }
 
-    // FILTERING AND SEARCH
+    // FILTERING AND SEARCH - FIXED METHOD NAMES
     @Transactional(readOnly = true)
     public Page<Movie> getMoviesByGenreId(Long genreId, Pageable pageable) {
         if (!genreRepository.existsById(genreId)) {
             throw new ResourceNotFoundException("Genre not found with id: " + genreId);
         }
-        return movieRepository.findByGenreId(genreId, pageable);
+        return movieRepository.findByGenresId(genreId, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -155,7 +160,7 @@ public class MovieService {
         if (!actorRepository.existsById(actorId)) {
             throw new ResourceNotFoundException("Actor not found with id: " + actorId);
         }
-        return movieRepository.findByActorId(actorId, pageable);
+        return movieRepository.findByActorsId(actorId, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -178,7 +183,6 @@ public class MovieService {
     public Movie updateMovie(Long id, Movie movieDetails) {
         Movie movie = getMovieById(id);
         
-        // Check for duplicate if title or year is being changed
         if ((movieDetails.getTitle() != null && !movie.getTitle().equals(movieDetails.getTitle())) ||
             (movieDetails.getReleaseYear() != null && !movie.getReleaseYear().equals(movieDetails.getReleaseYear()))) {
             
@@ -186,14 +190,12 @@ public class MovieService {
             Integer newYear = movieDetails.getReleaseYear() != null ? 
                 movieDetails.getReleaseYear() : movie.getReleaseYear();
             
-            // Check if another movie exists with the same title and year
             if (movieRepository.existsByTitleAndReleaseYear(newTitle, newYear)) {
                 throw new InvalidRequestException("Movie with title '" + newTitle + 
                     "' and release year '" + newYear + "' already exists");
             }
         }
 
-        // Update fields if provided
         if (movieDetails.getTitle() != null) {
             movie.setTitle(movieDetails.getTitle());
         }
@@ -204,7 +206,6 @@ public class MovieService {
             movie.setDuration(movieDetails.getDuration());
         }
 
-        // Clear relevant cache entries
         cacheService.remove("all_movies");
         cacheService.remove("all_movies_cached");
         cacheService.remove("movie_" + id);
@@ -221,9 +222,10 @@ public class MovieService {
             throw new ResourceNotFoundException("Some genres not found");
         }
         
-        genres.forEach(movie::addGenre);
+        for (Genre genre : genres) {
+            movie.addGenre(genre);
+        }
         
-        // Clear cache for this movie
         cacheService.remove("movie_" + movieId);
         
         return movieRepository.save(movie);
@@ -233,9 +235,10 @@ public class MovieService {
         Movie movie = getMovieById(movieId);
         List<Genre> genres = genreRepository.findByIdIn(genreIds);
         
-        genres.forEach(movie::removeGenre);
+        for (Genre genre : genres) {
+            movie.removeGenre(genre);
+        }
         
-        // Clear cache for this movie
         cacheService.remove("movie_" + movieId);
         
         return movieRepository.save(movie);
@@ -249,9 +252,10 @@ public class MovieService {
             throw new ResourceNotFoundException("Some actors not found");
         }
         
-        actors.forEach(movie::addActor);
+        for (Actor actor : actors) {
+            movie.addActor(actor);
+        }
         
-        // Clear cache for this movie
         cacheService.remove("movie_" + movieId);
         
         return movieRepository.save(movie);
@@ -261,9 +265,10 @@ public class MovieService {
         Movie movie = getMovieById(movieId);
         List<Actor> actors = actorRepository.findByIdIn(actorIds);
         
-        actors.forEach(movie::removeActor);
+        for (Actor actor : actors) {
+            movie.removeActor(actor);
+        }
         
-        // Clear cache for this movie
         cacheService.remove("movie_" + movieId);
         
         return movieRepository.save(movie);
@@ -272,27 +277,28 @@ public class MovieService {
     public Movie updateMovieRelations(Long movieId, List<Long> genreIds, List<Long> actorIds) {
         Movie movie = getMovieById(movieId);
         
-        // Update genres
         if (genreIds != null) {
             movie.getGenres().clear();
             List<Genre> genres = genreRepository.findByIdIn(genreIds);
             if (genres.size() != genreIds.size()) {
                 throw new ResourceNotFoundException("Some genres not found");
             }
-            genres.forEach(movie::addGenre);
+            for (Genre genre : genres) {
+                movie.addGenre(genre);
+            }
         }
         
-        // Update actors
         if (actorIds != null) {
             movie.getActors().clear();
             List<Actor> actors = actorRepository.findByIdIn(actorIds);
             if (actors.size() != actorIds.size()) {
                 throw new ResourceNotFoundException("Some actors not found");
             }
-            actors.forEach(movie::addActor);
+            for (Actor actor : actors) {
+                movie.addActor(actor);
+            }
         }
         
-        // Clear cache for this movie
         cacheService.remove("movie_" + movieId);
         
         return movieRepository.save(movie);
@@ -302,8 +308,6 @@ public class MovieService {
     public void deleteMovie(Long id, boolean force) {
         Movie movie = getMovieById(id);
         
-        // For movies, we typically allow deletion even with relationships
-      
         if (!force && (!movie.getGenres().isEmpty() || !movie.getActors().isEmpty())) {
             int genreCount = movie.getGenres().size();
             int actorCount = movie.getActors().size();
@@ -315,22 +319,18 @@ public class MovieService {
             );
         }
 
-        // If force=true, remove relationships before deletion
         if (force) {
-            // Remove from genres
             List<Genre> genres = List.copyOf(movie.getGenres());
             for (Genre genre : genres) {
-                genre.removeMovie(movie);
+                movie.removeGenre(genre);
             }
             
-            // Remove from actors
             List<Actor> actors = List.copyOf(movie.getActors());
             for (Actor actor : actors) {
-                actor.removeMovie(movie);
+                movie.removeActor(actor);
             }
         }
 
-        // Clear relevant cache entries
         cacheService.remove("all_movies");
         cacheService.remove("all_movies_cached");
         cacheService.remove("movie_" + id);

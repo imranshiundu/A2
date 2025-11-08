@@ -1,8 +1,13 @@
 package com.example.moviesapi.dto;
 
-import jakarta.validation.constraints.*;
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class MovieRequest {
     
@@ -12,7 +17,6 @@ public class MovieRequest {
 
     @NotNull(message = "Release year is required")
     @Min(value = 1888, message = "Release year must be 1888 or later")
-    @Max(value = 2030, message = "Release year must be 2030 or earlier")
     private Integer releaseYear;
 
     @NotNull(message = "Duration is required")
@@ -88,14 +92,6 @@ public class MovieRequest {
 
     public boolean hasActorIds() {
         return actorIds != null && !actorIds.isEmpty();
-    }
-
-    // Helper methods for validation
-    public void validateReleaseYear() {
-        int currentYear = java.time.Year.now().getValue();
-        if (releaseYear != null && (releaseYear < 1888 || releaseYear > currentYear + 1)) {
-            throw new IllegalArgumentException("Release year must be between 1888 and " + (currentYear + 1));
-        }
     }
 
     @Override
